@@ -11,25 +11,61 @@ $clientID="1a1f4bbc-f00e-4f67-b0b7-0d646bb1afd3"
 $clientSecret="Yg58Q~41GQYc_--ZVxCnh~U0vK4y3GyV9~WNqaZz"
 $dfcLocation="westeurope"
 
-#connect to tenant - check Least privilege role required
-$tokenBody = @{  
-    Grant_Type    = "client_credentials"  
-    Scope         = "https://management.azure.com/.default"  
-    Client_Id     = $clientId  
-    Client_Secret = $clientSecret  
-}   
+Function Authenticate {
+    <#
+    .SYNOPSIS
+    Authenticate with client_credetnial
+    .DESCRIPTION
+    .INPUTS
+    clientID, clientSecret, tenantID
+    .OUTPUTS
+    Authentication token
+    .EXAMPLE
+    #>
+    [CmdletBinding()]
+    Param(
+    [Parameter(Mandatory=$False)]
+    [String]
+    $clientID = "$clientID",
+    [Parameter(Mandatory=$False)]
+    [string]
+    $clientSecret = "$clientSecret",
+    [Parameter(Mandatory=$False)]
+    [string]
+    $tenantID = "$tenantID"
+    )
+    #connect to tenant - check Least privilege role required
+    $tokenBody = @{  
+        Grant_Type    = "client_credentials"  
+        Scope         = "https://management.azure.com/.default"  
+        Client_Id     = $clientId  
+        Client_Secret = $clientSecret  
+    }   
 
-$tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$Tenantid/oauth2/v2.0/token" -Method POST -Body $tokenBody
-$headers = @{ 
-	"Authorization" = "Bearer $($tokenResponse.access_token)" 
-	"Content-type" = "application/json" 
-} 
-
+    $tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$Tenantid/oauth2/v2.0/token" -Method POST -Body $tokenBody
+    return $tokenResponse
+}
 
 #Function get-MDCAACGroups
 # input:  subscription
 # output: list of AAC groups
 Function get-MDCAACGroups {
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory=$False)]
+        [String]
+        $SubID = "$subID",    
+        [Parameter(Mandatory=$False)]
+        [string]
+        $apiversion = "$apiversion",
+            [Parameter(Mandatory=$True)]
+        [PSCustomObject]
+        $tk
+    )
+    $headers = @{ 
+        "Authorization" = "Bearer $($tk.access_token)" 
+        "Content-type" = "application/json" 
+    }         
     $Url="https://management.azure.com/subscriptions/$subID/providers/Microsoft.Security/applicationWhitelistings?api-version=$apiversion"
     $groups=((Invoke-WebRequest -uri $Url -Headers $headers -Method GET).Content | convertFrom-Json).value
     return $groups
@@ -58,39 +94,50 @@ Function get-MDCAACGroupRecommendations {
     $apiversion = "$apiversion",
     [Parameter(Mandatory=$True)]
     [string]
-    $groupName
+    $groupName,
+    [Parameter(Mandatory=$True)]
+    [PSCustomObject]
+    $tk
     )
+    $headers = @{ 
+        "Authorization" = "Bearer $($tk.access_token)" 
+        "Content-type" = "application/json" 
+    }         
 
     $Url="https://management.azure.com/subscriptions/$subID/providers/Microsoft.Security/locations/$dfcLocation/applicationWhitelistings/${groupName}?api-version=$apiversion"
     $recommendations=((Invoke-WebRequest -uri $Url -Headers $headers -Method GET).Content | convertFrom-Json).properties
     return $recommendations
 }
 
-$groups = (get-MDCAACGroups).name
+$token = Authenticate
+$subs = (Get-AzSubscription).id
 $rules=@()
 
-
-foreach ($group in $groups){
-    write-host $group;
-    $recommendations = get-MDCAACGroupRecommendations -groupName $group
-    #check if $vms is not null
-    $vms=$recommendations.vmRecommendations.resourceId
-    $paths=$recommendations.pathRecommendations;
-    foreach ($vm in $vms) {
-        $vm=$vm.split('/')[-1]
-        foreach ($path in $paths) {
-            $rule = New-Object PSobject -Property @{
-                "vm" = "$vm"
-                "arch" = $recommendations.sourceSystem -eq "Azure_AuditD" ? "Linux" : "Windows"
-                "path" = $path.path
-                "type" = $path.type
-                "common" = $path.common
-                "filetype" = $path.filetype
-                "status" = $path.configurationStatus
+foreach ($sub in $subs) {
+    $groups = (get-MDCAACGroups -tk $token -SubID $sub ).name
+    foreach ($group in $groups){
+        write-host $group;
+        $recommendations = get-MDCAACGroupRecommendations -SubID $sub -groupName $group -TK $token
+        #check if $vms is not null
+        $vms=$recommendations.vmRecommendations.resourceId
+        $paths=$recommendations.pathRecommendations;
+        foreach ($vm in $vms) {
+            $vm=$vm.split('/')[-1]
+            foreach ($path in $paths) {
+                $rule = New-Object PSobject -Property @{
+                    "subscription" = $sub
+                    "vm" = "$vm"
+                    "arch" = $recommendations.sourceSystem -eq "Azure_AuditD" ? "Linux" : "Windows"
+                    "path" = $path.path
+                    "type" = $path.type
+                    "common" = $path.common
+                    "filetype" = $path.filetype
+                    "status" = $path.configurationStatus
+                }
+                $rules+=$rule
             }
-            $rules+=$rule
         }
     }
 }
 
-$rules | Select-Object vm,arch,type,filetype,common,path,status | Export-Csv -Path ./rules.csv
+$rules | Select-Object subscription,vm,arch,type,filetype,common,path,status | Export-Csv -Path ./rules.csv
