@@ -2,14 +2,15 @@
 #az ad sp create-for-rbac --role Contributor --scopes /subscriptions/xxxxxxxx-d42d-427a-be6f-bd986473915b
 #az ad sp create-for-rbac --role Contributor --scopes /providers/Microsoft.Management/managementGroups/xxxxxxxx-bc24-40c7-95a4-b17d1889750f
 #az role assignment create --assignee "xxxxxxxx-f00e-4f67-b0b7-0d646bb1afd3" --role "Contributor"--scope "/providers/Microsoft.Management/managementGroups/xxxxxxxx-bc24-40c7-95a4-b17d1889750f"
+# configure AuthData.conf file with the relative information
 # requires PS 7
 
 $apiversion="2015-06-01-preview" #supports 2015-06-01-preview and 2020-01-01
-$subID="xxxxxxxx-bffc-426f-99dd-0b52fa36f4b8"
-$tenantID="xxxxxxxx-bc24-40c7-95a4-b17d1889750f"
-$clientID="xxxxxxxx-f00e-4f67-b0b7-0d646bb1afd3"
-$clientSecret="Yg5xxxxxxxxxxNqaZz"
 $dfcLocation="westeurope"
+$settings=get-content -Path .\AuthData.json | ConvertFrom-Json
+$tenantID=$settings.tenantid
+$clientID=$settings.clientID
+$clientSecret=$settings.clientSecret
 
 Function Authenticate {
     <#
