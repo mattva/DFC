@@ -126,6 +126,7 @@ foreach ($sub in $subs) {
             foreach ($path in $paths) {
                 $rule = New-Object PSobject -Property @{
                     "subscription" = $sub
+                    "group" = $group
                     "vm" = "$vm"
                     "arch" = $recommendations.sourceSystem -eq "Azure_AuditD" ? "Linux" : "Windows"
                     "path" = $path.path
@@ -140,4 +141,4 @@ foreach ($sub in $subs) {
     }
 }
 
-$rules | Select-Object subscription,vm,arch,type,filetype,common,path,status | Export-Csv -Path ./rules.csv
+$rules | Select-Object subscription,group,vm,arch,type,filetype,common,path,status | Export-Csv -Path ./rules.csv
