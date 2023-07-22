@@ -5,16 +5,16 @@
 # requires PS 7
 
 $apiversion="2015-06-01-preview" #supports 2015-06-01-preview and 2020-01-01
-$subID="c3aad7b8-bffc-426f-99dd-0b52fa36f4b8"
-$tenantID="75c0f721-bc24-40c7-95a4-b17d1889750f"
-$clientID="1a1f4bbc-f00e-4f67-b0b7-0d646bb1afd3"
-$clientSecret="Yg58Q~41GQYc_--ZVxCnh~U0vK4y3GyV9~WNqaZz"
+$subID="xxxxxxxx-bffc-426f-99dd-0b52fa36f4b8"
+$tenantID="xxxxxxxx-bc24-40c7-95a4-b17d1889750f"
+$clientID="xxxxxxxx-f00e-4f67-b0b7-0d646bb1afd3"
+$clientSecret="Yg5xxxxxxxxxxNqaZz"
 $dfcLocation="westeurope"
 
 Function Authenticate {
     <#
     .SYNOPSIS
-    Authenticate with client_credetnial
+    OAuth 2.0 authentication with client_credentials flow
     .DESCRIPTION
     .INPUTS
     clientID, clientSecret, tenantID
@@ -34,7 +34,6 @@ Function Authenticate {
     [string]
     $tenantID = "$tenantID"
     )
-    #connect to tenant - check Least privilege role required
     $tokenBody = @{  
         Grant_Type    = "client_credentials"  
         Scope         = "https://management.azure.com/.default"  
@@ -42,7 +41,13 @@ Function Authenticate {
         Client_Secret = $clientSecret  
     }   
 
-    $tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$Tenantid/oauth2/v2.0/token" -Method POST -Body $tokenBody
+    try {
+        $tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$Tenantid/oauth2/v2.0/token" -Method POST -Body $tokenBody        
+    }
+    catch {
+        Write-Output "Cannot authenticate to tenant $tenantID"
+        exit
+    }
     return $tokenResponse
 }
 
@@ -50,6 +55,16 @@ Function Authenticate {
 # input:  subscription
 # output: list of AAC groups
 Function get-MDCAACGroups {
+    <#
+    .SYNOPSIS
+    Get all Adaptive Application Control groups defined for the susbscription
+    .DESCRIPTION
+    .INPUTS
+    access token object, subscriptionid, apiversion
+    .OUTPUTS
+    list of groups defined
+    .EXAMPLE
+    #>
     [CmdletBinding()]
     Param(
         [Parameter(Mandatory=$False)]
@@ -58,7 +73,7 @@ Function get-MDCAACGroups {
         [Parameter(Mandatory=$False)]
         [string]
         $apiversion = "$apiversion",
-            [Parameter(Mandatory=$True)]
+        [Parameter(Mandatory=$True)]
         [PSCustomObject]
         $tk
     )
@@ -71,14 +86,15 @@ Function get-MDCAACGroups {
     return $groups
 }
 #Function get-MDCAACGroupRecommendations
-# input:  group, location, subscription
-# output: list of recommendations configured in the group
 Function get-MDCAACGroupRecommendations {
-<#
+    <#
     .SYNOPSIS
+    Get all recommendations inside a group
     .DESCRIPTION
     .INPUTS
+    Subscription ID, Location of AAC group, apiversion, groupname, authentication token
     .OUTPUTS
+    list of recommendations inside the specified AAC group
     .EXAMPLE
     #>
     [CmdletBinding()]
