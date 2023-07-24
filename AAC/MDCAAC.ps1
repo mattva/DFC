@@ -203,7 +203,8 @@ foreach ($sub in $subs) {
                     "subscription" = $sub
                     "group" = $group
                     "vm" = "$vm"
-                    "arch" = $recommendations.sourceSystem -eq "Azure_AuditD" ? "Linux" : "Windows"
+                    "arch" = $recommendations.sourceSystem -ilike "*AuditD" ? "Linux" : "Windows"
+                    "platform" = $recommendations.sourceSystem -ilike "NonAzure*" ? "ARC" : "Azure"
                     "path" = $path.path
                     "type" = $path.type
                     "common" = $path.common
@@ -216,4 +217,4 @@ foreach ($sub in $subs) {
     }
 }
 
-$rules | Select-Object subscription,group,vm,arch,type,filetype,common,path,status | Export-Csv -Path ./rules.csv
+$rules | Select-Object subscription,group,vm,arch,platform,type,filetype,common,path,status | Export-Csv -Path ./rules.csv
